@@ -53,9 +53,10 @@ No fixed calendar dates. Each milestone has a clear goal, deliverables, and an *
 - "My Complaints" list view for citizens
 
 **Exit Criteria**
-- [ ] Citizen can submit a complaint with image + pinned location
-- [ ] Complaint appears immediately in "My Complaints"
-- [ ] Uploaded images render correctly on complaint detail page
+- [x] Citizen can submit a complaint with image + pinned location
+- [x] Complaint appears immediately in "My Complaints"
+- [x] Uploaded images render correctly on complaint detail page
+**Status:** ✅ COMPLETE — Aug 3, 2026
 
 ---
 

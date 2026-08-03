@@ -1,10 +1,13 @@
 import React from "react";
-import { Routes, Route, Link, NavLink, useNavigate } from "react-router-dom";
+import { Routes, Route, Link, NavLink } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import HealthCheck from "./pages/HealthCheck";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import ReportIssue from "./pages/ReportIssue";
+import MyComplaints from "./pages/MyComplaints";
+import ComplaintDetail from "./pages/ComplaintDetail";
 import Unauthorized from "./pages/Unauthorized";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -19,8 +22,18 @@ function NavBar() {
         <div className="space-x-4">
           {isAuthenticated ? (
             <>
+              {user?.role === "citizen" && (
+                <>
+                  <NavLink to="/report" className="text-sm text-gray-600 hover:text-primary">
+                    Report Issue
+                  </NavLink>
+                  <NavLink to="/my-complaints" className="text-sm text-gray-600 hover:text-primary">
+                    My Complaints
+                  </NavLink>
+                </>
+              )}
               <span className="text-sm text-gray-600">
-                Logged in as {user?.name} ({user?.role})
+                {user?.name} ({user?.role})
               </span>
               <button
                 onClick={logout}
@@ -60,6 +73,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/report"
+            element={
+              <ProtectedRoute allowedRoles={["citizen"]}>
+                <ReportIssue />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-complaints"
+            element={
+              <ProtectedRoute allowedRoles={["citizen"]}>
+                <MyComplaints />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/complaints/:id"
+            element={
+              <ProtectedRoute>
+                <ComplaintDetail />
               </ProtectedRoute>
             }
           />
