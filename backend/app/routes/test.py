@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 from app.extensions import db
 from app.models.user import User
+from app.routes.auth import role_required
 
 test_bp = Blueprint("test", __name__)
 
@@ -30,3 +31,8 @@ def test_db():
         "message": "Read/write to MySQL works",
         "test_user": fetched.to_dict(),
     })
+
+@test_bp.route("/admin-only")
+@role_required("admin")
+def admin_only():
+    return jsonify({"msg": "Admin access granted"})
