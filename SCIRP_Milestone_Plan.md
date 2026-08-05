@@ -70,9 +70,10 @@ No fixed calendar dates. Each milestone has a clear goal, deliverables, and an *
 - `PUT /complaints/{id}` for status/field updates
 
 **Exit Criteria**
-- [ ] Status can only move through valid transitions (no skipping/backwards without reason)
-- [ ] Every status change produces a log entry
-- [ ] Citizen sees a readable timeline, not just a status label
+- [x] Status can only move through valid transitions (no skipping/backwards without reason)
+- [x] Every status change produces a log entry
+- [x] Citizen sees a readable timeline, not just a status label
+**Status:** ✅ COMPLETE — Aug 5, 2026
 
 ---
 

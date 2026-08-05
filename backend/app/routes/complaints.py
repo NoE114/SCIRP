@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -8,16 +9,52 @@ from flask import (
     send_from_directory,
     current_app,
 )
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models.user import User, UserRole
 from app.models.complaint import Complaint, ComplaintStatus, ComplaintPriority
+from app.models.complaint_log import ComplaintLog
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 
 complaints_bp = Blueprint("complaints", __name__)
+
+VALID_TRANSITIONS = {
+    ComplaintStatus.SUBMITTED: {
+        ComplaintStatus.VERIFIED,
+        ComplaintStatus.ASSIGNED,
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.CLOSED,
+    },
+    ComplaintStatus.VERIFIED: {
+        ComplaintStatus.ASSIGNED,
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.CLOSED,
+    },
+    ComplaintStatus.ASSIGNED: {
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.CLOSED,
+    },
+    ComplaintStatus.IN_PROGRESS: {
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.CLOSED,
+    },
+    ComplaintStatus.RESOLVED: {
+        ComplaintStatus.CLOSED,
+    },
+    ComplaintStatus.CLOSED: set(),
+}
+
+
+def is_valid_transition(old_status, new_status, role):
+    if role == "admin":
+        return True
+    return new_status in VALID_TRANSITIONS.get(old_status, set())
 
 
 @complaints_bp.route("", methods=["POST"])
@@ -97,7 +134,88 @@ def get_complaint(complaint_id):
     complaint = db.session.get(Complaint, complaint_id)
     if not complaint:
         return jsonify({"msg": "Complaint not found"}), 404
-    return jsonify({"complaint": complaint.to_dict()})
+
+    logs = (
+        db.session.query(ComplaintLog)
+        .filter_by(complaint_id=complaint_id)
+        .order_by(ComplaintLog.created_at.asc())
+        .all()
+    )
+
+    return jsonify({
+        "complaint": complaint.to_dict(),
+        "logs": [log.to_dict() for log in logs],
+    })
+
+
+@complaints_bp.route("/<int:complaint_id>", methods=["PUT"])
+@jwt_required()
+def update_complaint(complaint_id):
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role not in ("officer", "admin"):
+        return jsonify({"msg": "Only officers and admins can update complaints"}), 403
+
+    complaint = db.session.get(Complaint, complaint_id)
+    if not complaint:
+        return jsonify({"msg": "Complaint not found"}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"msg": "Missing JSON body"}), 400
+
+    old_status = complaint.status
+    new_status_str = data.get("status")
+    remarks = data.get("remarks", "")
+
+    if new_status_str:
+        try:
+            new_status = ComplaintStatus(new_status_str)
+        except ValueError:
+            return jsonify({"msg": "Invalid status"}), 400
+
+        if not is_valid_transition(old_status, new_status, role):
+            return jsonify({
+                "msg": f"Invalid status transition: {old_status.value} → {new_status.value}",
+            }), 400
+
+        complaint.status = new_status
+
+        log = ComplaintLog(
+            complaint_id=complaint_id,
+            old_status=old_status.value,
+            new_status=new_status.value,
+            officer_id=user_id,
+            remarks=remarks,
+        )
+        db.session.add(log)
+
+    if "priority" in data:
+        try:
+            complaint.priority = ComplaintPriority(data["priority"])
+        except ValueError:
+            return jsonify({"msg": "Invalid priority"}), 400
+
+    if "category" in data:
+        complaint.category = data["category"]
+
+    db.session.commit()
+
+    logs = (
+        db.session.query(ComplaintLog)
+        .filter_by(complaint_id=complaint_id)
+        .order_by(ComplaintLog.created_at.asc())
+        .all()
+    )
+
+    return jsonify({
+        "msg": "Complaint updated",
+        "complaint": complaint.to_dict(),
+        "logs": [log.to_dict() for log in logs],
+    })
 
 
 @complaints_bp.route("/<int:complaint_id>/image", methods=["GET"])
