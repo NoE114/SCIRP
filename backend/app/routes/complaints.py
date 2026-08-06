@@ -70,7 +70,7 @@ def create_complaint():
     category = request.form.get("category", "other")
     latitude = request.form.get("latitude")
     longitude = request.form.get("longitude")
-    priority = request.form.get("priority", ComplaintPriority.MEDIUM.value)
+    priority_input = request.form.get("priority", "auto")
 
     if not title or not description or not latitude or not longitude:
         return jsonify({"msg": "title, description, latitude, and longitude are required"}), 400
@@ -81,8 +81,12 @@ def create_complaint():
     except ValueError:
         return jsonify({"msg": "Invalid latitude/longitude"}), 400
 
-    if priority not in [p.value for p in ComplaintPriority]:
-        return jsonify({"msg": "Invalid priority"}), 400
+    # Auto-predict priority if "auto" or invalid
+    from app.services.ai import detect_duplicates, predict_priority
+    if priority_input == "auto" or priority_input not in [p.value for p in ComplaintPriority]:
+        priority = predict_priority(category, description, title, lat, lng)
+    else:
+        priority = ComplaintPriority(priority_input)
 
     image_filename = None
     if "image" in request.files:
@@ -102,7 +106,7 @@ def create_complaint():
         image_filename=image_filename,
         latitude=lat,
         longitude=lng,
-        priority=ComplaintPriority(priority),
+        priority=priority,
         status=ComplaintStatus.SUBMITTED,
         user_id=user_id,
     )
@@ -129,7 +133,16 @@ def create_complaint():
             complaint_id=complaint.id,
         )
 
-    return jsonify({"msg": "Complaint created", "complaint": complaint.to_dict()}), 201
+    # Run duplicate detection for the response
+    duplicates = detect_duplicates(lat, lng, category, description, title, complaint.id)
+
+    return jsonify({
+        "msg": "Complaint created",
+        "complaint": complaint.to_dict(),
+        "predicted_priority": complaint.priority.value,
+        "duplicates_found": len(duplicates),
+        "duplicates": duplicates,
+    }), 201
 
 
 @complaints_bp.route("", methods=["GET"])

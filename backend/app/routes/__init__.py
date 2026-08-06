@@ -5,6 +5,7 @@ from app.routes.departments import departments_bp
 from app.routes.admin import admin_bp
 from app.routes.analytics import analytics_bp
 from app.routes.notifications import notifications_bp
+from app.routes.ai import ai_bp
 
 def register_routes(app):
     app.register_blueprint(test_bp, url_prefix="/api")
@@ -14,3 +15,4 @@ def register_routes(app):
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(analytics_bp, url_prefix="/api")
     app.register_blueprint(notifications_bp, url_prefix="/api")
+    app.register_blueprint(ai_bp, url_prefix="/api")

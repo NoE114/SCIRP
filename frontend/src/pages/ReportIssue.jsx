@@ -30,7 +30,7 @@ const CATEGORIES = [
   "other",
 ];
 
-const PRIORITIES = ["low", "medium", "high", "urgent"];
+const PRIORITIES = ["low", "medium", "high", "urgent", "auto"];
 
 export default function ReportIssue() {
   const { user } = useAuth();
@@ -42,6 +42,9 @@ export default function ReportIssue() {
   const [position, setPosition] = useState([40.7128, -74.006]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [predictedPriority, setPredictedPriority] = useState(null);
+  const [duplicates, setDuplicates] = useState([]);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -68,13 +71,54 @@ export default function ReportIssue() {
     if (image) formData.append("image", image);
 
     try {
-      await apiRequest("/complaints", { method: "POST", body: formData });
+      const res = await apiRequest("/complaints", { method: "POST", body: formData });
+      if (res.duplicates_found > 0) {
+        const confirmed = window.confirm(
+          `Potential duplicate(s) found (${res.duplicates_found}). Submit anyway?`
+        );
+        if (!confirmed) {
+          setSubmitting(false);
+          return;
+        }
+      }
       window.location.href = "/my-complaints";
     } catch (err) {
       setError(err.message);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const runAIAnalysis = async () => {
+    if (!title || !description) {
+      alert("Please enter a title and description first");
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const [priorityRes, dupRes] = await Promise.all([
+        apiRequest("/ai/predict-priority", {
+          method: "POST",
+          body: JSON.stringify({
+            category, description, title,
+            latitude: position[0], longitude: position[1],
+          }),
+        }).catch(() => null),
+        apiRequest("/ai/detect-duplicates", {
+          method: "POST",
+          body: JSON.stringify({
+            category, description, title,
+            latitude: position[0], longitude: position[1],
+          }),
+        }).catch(() => null),
+      ]);
+
+      if (priorityRes) setPredictedPriority(priorityRes.predicted_priority);
+      if (dupRes) setDuplicates(dupRes.duplicates);
+    } catch (err) {
+      console.error(err);
+    }
+    setAnalyzing(false);
   };
 
   return (
@@ -135,6 +179,11 @@ export default function ReportIssue() {
                 </option>
               ))}
             </select>
+            {predictedPriority && priority === "auto" && (
+              <p className="text-xs text-gray-500 mt-1">
+                AI predicted: <span className="font-medium">{predictedPriority.toUpperCase()}</span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -146,6 +195,39 @@ export default function ReportIssue() {
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={runAIAnalysis}
+            disabled={analyzing || !title || !description}
+            className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {analyzing ? "Analyzing..." : "AI Analyze (Check for Duplicates)"}
+          </button>
+
+          {duplicates.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+              <h4 className="font-medium text-yellow-800 mb-2">
+                Potential Duplicates Found ({duplicates.length})
+              </h4>
+              <ul className="space-y-1 text-sm">
+                {duplicates.map((dup) => (
+                  <li key={dup.id} className="text-yellow-700">
+                    #{dup.id} · {dup.distance_m}m away · {dup.created_at} · {" "}
+                    <a
+                      href={`/complaints/${dup.id}`}
+                      className="underline hover:text-yellow-900"
+                    >
+                      View
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-yellow-600 mt-2">
+                Please review these before submitting.
+              </p>
+            </div>
+          )}
 
           <button
             type="submit"
