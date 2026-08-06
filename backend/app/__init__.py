@@ -14,5 +14,9 @@ def create_app(config_name="default"):
 
     with app.app_context():
         db.create_all()
+        from app.models.department import seed_departments
+        from app.models.department import Department
+        if db.session.query(Department).count() == 0:
+            seed_departments()
 
     return app

@@ -19,6 +19,7 @@ class User(db.Model):
     phone = db.Column(db.String(20))
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum(UserRole), default=UserRole.CITIZEN, nullable=False)
+    department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -35,6 +36,7 @@ class User(db.Model):
             "email": self.email,
             "phone": self.phone,
             "role": self.role.value,
+            "department_id": self.department_id,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
         }

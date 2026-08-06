@@ -118,6 +118,12 @@ export default function ComplaintDetail() {
               <img src={complaint.image_url} alt="Complaint" className="mt-2 max-w-full h-auto rounded border" />
             </div>
           )}
+          {complaint.proof_image_url && (
+            <div>
+              <label className="text-sm text-gray-500">Proof of Resolution</label>
+              <img src={complaint.proof_image_url} alt="Proof" className="mt-2 max-w-full h-auto rounded border" />
+            </div>
+          )}
         </div>
 
         <div>

@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import ReportIssue from "./pages/ReportIssue";
 import MyComplaints from "./pages/MyComplaints";
 import ComplaintDetail from "./pages/ComplaintDetail";
+import OfficerDashboard from "./pages/OfficerDashboard";
 import Unauthorized from "./pages/Unauthorized";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -22,7 +23,7 @@ function NavBar() {
         <div className="space-x-4">
           {isAuthenticated ? (
             <>
-              {user?.role === "citizen" && (
+               {user?.role === "citizen" && (
                 <>
                   <NavLink to="/report" className="text-sm text-gray-600 hover:text-primary">
                     Report Issue
@@ -32,6 +33,11 @@ function NavBar() {
                   </NavLink>
                 </>
               )}
+              {user?.role === "officer" || user?.role === "admin" ? (
+                <NavLink to="/officer-dashboard" className="text-sm text-gray-600 hover:text-primary">
+                  Officer Dashboard
+                </NavLink>
+              ) : null}
               <span className="text-sm text-gray-600">
                 {user?.name} ({user?.role})
               </span>
@@ -73,6 +79,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/officer-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["officer", "admin"]}>
+                <OfficerDashboard />
               </ProtectedRoute>
             }
           />

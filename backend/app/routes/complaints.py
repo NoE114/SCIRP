@@ -120,7 +120,7 @@ def list_complaints():
     if user.role == UserRole.CITIZEN:
         query = query.filter_by(user_id=user_id)
     elif user.role == UserRole.OFFICER:
-        pass
+        query = query.filter_by(department_id=user.department_id)
     elif user.role == UserRole.ADMIN:
         pass
 
@@ -202,6 +202,12 @@ def update_complaint(complaint_id):
     if "category" in data:
         complaint.category = data["category"]
 
+    if "department_id" in data:
+        if role == "officer":
+            if data["department_id"] != user.department_id:
+                return jsonify({"msg": "Officers can only assign to their own department"}), 403
+        complaint.department_id = data["department_id"]
+
     db.session.commit()
 
     logs = (
@@ -227,4 +233,54 @@ def get_complaint_image(complaint_id):
     return send_from_directory(
         UPLOAD_FOLDER,
         complaint.image_filename,
+    )
+
+
+@complaints_bp.route("/<int:complaint_id>/proof", methods=["POST"])
+@jwt_required()
+def upload_proof(complaint_id):
+    user_id = int(get_jwt_identity())
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role not in ("officer", "admin"):
+        return jsonify({"msg": "Only officers and admins can upload proof"}), 403
+
+    complaint = db.session.get(Complaint, complaint_id)
+    if not complaint:
+        return jsonify({"msg": "Complaint not found"}), 404
+
+    if "image" not in request.files:
+        return jsonify({"msg": "No image provided"}), 400
+
+    file = request.files["image"]
+    if not file or not file.filename:
+        return jsonify({"msg": "No image selected"}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        return jsonify({"msg": "Unsupported image format"}), 400
+
+    proof_filename = f"proof_{uuid.uuid4().hex}{ext}"
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    file.save(os.path.join(UPLOAD_FOLDER, proof_filename))
+
+    complaint.proof_image_filename = proof_filename
+    db.session.commit()
+
+    return jsonify({
+        "msg": "Proof uploaded",
+        "proof_image_url": f"/api/complaints/{complaint_id}/proof-image",
+    }), 200
+
+
+@complaints_bp.route("/<int:complaint_id>/proof-image", methods=["GET"])
+def get_complaint_proof_image(complaint_id):
+    complaint = db.session.get(Complaint, complaint_id)
+    if not complaint or not complaint.proof_image_filename:
+        return jsonify({"msg": "Proof image not found"}), 404
+
+    return send_from_directory(
+        UPLOAD_FOLDER,
+        complaint.proof_image_filename,
     )

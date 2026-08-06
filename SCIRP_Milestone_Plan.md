@@ -87,9 +87,10 @@ No fixed calendar dates. Each milestone has a clear goal, deliverables, and an *
 - Proof-of-resolution image upload
 
 **Exit Criteria**
-- [ ] Officer only sees complaints for their own department
-- [ ] Officer can accept, update, and close a complaint with proof image
-- [ ] Urgent/high-priority complaints are visually flagged
+- [x] Officer only sees complaints for their own department
+- [x] Officer can accept, update, and close a complaint with proof image
+- [x] Urgent/high-priority complaints are visually flagged
+**Status:** ✅ COMPLETE — Aug 6, 2026
 
 ---
 

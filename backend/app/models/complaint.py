@@ -27,6 +27,7 @@ class Complaint(db.Model):
     description = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(100), default="other")
     image_filename = db.Column(db.String(255))
+    proof_image_filename = db.Column(db.String(255))
     latitude = db.Column(db.Numeric(10, 8), nullable=False)
     longitude = db.Column(db.Numeric(11, 8), nullable=False)
     priority = db.Column(
@@ -40,6 +41,7 @@ class Complaint(db.Model):
         nullable=False,
     )
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime,
@@ -56,11 +58,13 @@ class Complaint(db.Model):
             "description": self.description,
             "category": self.category,
             "image_url": f"/api/complaints/{self.id}/image" if self.image_filename else None,
+            "proof_image_url": f"/api/complaints/{self.id}/proof-image" if self.proof_image_filename else None,
             "latitude": float(self.latitude),
             "longitude": float(self.longitude),
             "priority": self.priority.value,
             "status": self.status.value,
             "user_id": self.user_id,
+            "department_id": self.department_id,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
