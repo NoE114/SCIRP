@@ -10,7 +10,7 @@ class Department(db.Model):
     description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    users = db.relationship("User", backref="department_obj", lazy=True)
+    users = db.relationship("User", backref="department", lazy=True)
 
     def to_dict(self):
         return {

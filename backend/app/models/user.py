@@ -37,6 +37,7 @@ class User(db.Model):
             "phone": self.phone,
             "role": self.role.value,
             "department_id": self.department_id,
+            "department_name": self.department.name if self.department else None,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
         }

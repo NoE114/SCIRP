@@ -42,6 +42,7 @@ class Complaint(db.Model):
     )
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
+    is_spam = db.Column(db.Boolean, default=False, server_default="0", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime,
@@ -50,6 +51,7 @@ class Complaint(db.Model):
     )
 
     user = db.relationship("User", backref=db.backref("complaints", lazy=True))
+    department = db.relationship("Department", backref=db.backref("complaints", lazy=True))
 
     def to_dict(self):
         return {
@@ -65,6 +67,8 @@ class Complaint(db.Model):
             "status": self.status.value,
             "user_id": self.user_id,
             "department_id": self.department_id,
+            "department_name": self.department.name if self.department else None,
+            "is_spam": self.is_spam,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

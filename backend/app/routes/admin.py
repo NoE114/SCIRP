@@ -1,0 +1,164 @@
+from collections import Counter
+from datetime import datetime
+
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models.user import User, UserRole
+from app.models.complaint import Complaint, ComplaintStatus, ComplaintPriority
+from app.models.complaint_log import ComplaintLog
+from app.models.department import Department
+
+admin_bp = Blueprint("admin", __name__)
+
+
+@admin_bp.route("/dashboard", methods=["GET"])
+@jwt_required()
+def dashboard():
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can access the dashboard"}), 403
+
+    users = db.session.query(User).all()
+    complaints = db.session.query(Complaint).all()
+    departments = db.session.query(Department).all()
+
+    users_by_role = Counter(u.role.value for u in users)
+    complaints_by_status = Counter(c.status.value for c in complaints)
+    complaints_by_category = Counter(c.category for c in complaints)
+    complaints_by_dept = Counter(
+        c.department.name if c.department else "Unassigned" for c in complaints
+    )
+
+    recent_complaints = (
+        db.session.query(Complaint)
+        .order_by(Complaint.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return jsonify({
+        "stats": {
+            "total_users": len(users),
+            "users_by_role": dict(users_by_role),
+            "total_complaints": len(complaints),
+            "complaints_by_status": dict(complaints_by_status),
+            "complaints_by_category": dict(complaints_by_category),
+            "complaints_by_department": dict(complaints_by_dept),
+            "total_departments": len(departments),
+        },
+        "recent_complaints": [c.to_dict() for c in recent_complaints],
+    })
+
+
+@admin_bp.route("/officer", methods=["POST"])
+@jwt_required()
+def create_officer():
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can create officers"}), 403
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"msg": "Missing JSON body"}), 400
+
+    name = data.get("name")
+    email = data.get("email")
+    password = data.get("password")
+    phone = data.get("phone")
+    department_id = data.get("department_id")
+
+    if not name or not email or not password:
+        return jsonify({"msg": "name, email, and password are required"}), 400
+
+    if db.session.query(User).filter_by(email=email).first():
+        return jsonify({"msg": "Email already registered"}), 409
+
+    if department_id:
+        dept = db.session.get(Department, department_id)
+        if not dept:
+            return jsonify({"msg": "Department not found"}), 404
+
+    officer = User(
+        name=name,
+        email=email,
+        phone=phone,
+        role=UserRole.OFFICER,
+        department_id=department_id,
+    )
+    officer.set_password(password)
+    db.session.add(officer)
+    db.session.commit()
+
+    return jsonify({"msg": "Officer created", "officer": officer.to_dict()}), 201
+
+
+@admin_bp.route("/users", methods=["GET"])
+@jwt_required()
+def list_users():
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can list users"}), 403
+
+    users = db.session.query(User).all()
+    return jsonify({"users": [u.to_dict() for u in users]})
+
+
+@admin_bp.route("/users/<int:user_id>", methods=["PUT"])
+@jwt_required()
+def update_user(user_id):
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can update users"}), 403
+
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"msg": "Missing JSON body"}), 400
+
+    if "is_active" in data:
+        user.is_active = data["is_active"]
+
+    if "department_id" in data:
+        if data["department_id"]:
+            dept = db.session.get(Department, data["department_id"])
+            if not dept:
+                return jsonify({"msg": "Department not found"}), 404
+        user.department_id = data["department_id"]
+
+    if "name" in data:
+        user.name = data["name"]
+
+    if "role" in data:
+        try:
+            user.role = UserRole(data["role"])
+        except ValueError:
+            return jsonify({"msg": "Invalid role"}), 400
+
+    db.session.commit()
+    return jsonify({"msg": "User updated", "user": user.to_dict()})
+
+
+@admin_bp.route("/complaints/<int:complaint_id>/spam", methods=["PUT"])
+@jwt_required()
+def flag_spam(complaint_id):
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can flag complaints"}), 403
+
+    complaint = db.session.get(Complaint, complaint_id)
+    if not complaint:
+        return jsonify({"msg": "Complaint not found"}), 404
+
+    data = request.get_json() or {}
+    is_spam = data.get("is_spam", True)
+    complaint.is_spam = is_spam
+
+    db.session.commit()
+
+    return jsonify({"msg": "Complaint updated", "is_spam": complaint.is_spam}), 200
