@@ -12,7 +12,7 @@ A full-stack civic complaint platform where citizens report issues (potholes, ga
 ### 1. Clone and Set Up the Repository
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/NoE114/SCIRP
 cd SCIRP
 ```
 
