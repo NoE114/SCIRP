@@ -10,6 +10,7 @@ import MyComplaints from "./pages/MyComplaints";
 import ComplaintDetail from "./pages/ComplaintDetail";
 import OfficerDashboard from "./pages/OfficerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import Unauthorized from "./pages/Unauthorized";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -42,6 +43,11 @@ function NavBar() {
                {user?.role === "admin" ? (
                  <NavLink to="/admin-dashboard" className="text-sm text-gray-600 hover:text-primary">
                    Admin Dashboard
+                 </NavLink>
+               ) : null}
+               {user?.role === "admin" ? (
+                 <NavLink to="/analytics" className="text-sm text-gray-600 hover:text-primary">
+                   Analytics
                  </NavLink>
                ) : null}
               <span className="text-sm text-gray-600">
@@ -117,6 +123,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["citizen"]}>
                 <MyComplaints />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AnalyticsDashboard />
               </ProtectedRoute>
             }
           />
