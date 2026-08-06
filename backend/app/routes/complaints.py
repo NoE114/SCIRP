@@ -16,6 +16,7 @@ from app.extensions import db
 from app.models.user import User, UserRole
 from app.models.complaint import Complaint, ComplaintStatus, ComplaintPriority
 from app.models.complaint_log import ComplaintLog
+from app.routes.notifications import create_notification
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 
@@ -61,6 +62,8 @@ def is_valid_transition(old_status, new_status, role):
 @jwt_required()
 def create_complaint():
     user_id = int(get_jwt_identity())
+    claims = get_jwt()
+    user_name = claims.get("name", "Unknown")
 
     title = request.form.get("title")
     description = request.form.get("description")
@@ -105,6 +108,26 @@ def create_complaint():
     )
     db.session.add(complaint)
     db.session.commit()
+
+    # Notify citizen who filed the complaint
+    create_notification(
+        user_id=user_id,
+        title="Complaint Submitted",
+        message=f"Your complaint #{complaint.id} has been received and is awaiting review.",
+        category="status_change",
+        complaint_id=complaint.id,
+    )
+
+    # Notify admins about new complaint
+    admins = User.query.filter_by(role=UserRole.ADMIN, is_active=True).all()
+    for admin in admins:
+        create_notification(
+            user_id=admin.id,
+            title="New Complaint Filed",
+            message=f"{user_name} filed a new complaint #{complaint.id}: {complaint.title}",
+            category="new_complaint",
+            complaint_id=complaint.id,
+        )
 
     return jsonify({"msg": "Complaint created", "complaint": complaint.to_dict()}), 201
 
@@ -209,6 +232,16 @@ def update_complaint(complaint_id):
         complaint.department_id = data["department_id"]
 
     db.session.commit()
+
+    # Notify citizen if status changed
+    if new_status_str:
+        create_notification(
+            user_id=complaint.user_id,
+            title="Complaint Status Updated",
+            message=f"Your complaint #{complaint_id} status has changed from {old_status.value} to {new_status.value}.",
+            category="status_change",
+            complaint_id=complaint_id,
+        )
 
     logs = (
         db.session.query(ComplaintLog)

@@ -21,6 +21,7 @@ class User(db.Model):
     role = db.Column(db.Enum(UserRole), default=UserRole.CITIZEN, nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
+    email_notifications = db.Column(db.Boolean, default=True, server_default="1", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -39,5 +40,6 @@ class User(db.Model):
             "department_id": self.department_id,
             "department_name": self.department.name if self.department else None,
             "is_active": self.is_active,
+            "email_notifications": self.email_notifications,
             "created_at": self.created_at.isoformat(),
         }

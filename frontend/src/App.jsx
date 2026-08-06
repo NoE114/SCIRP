@@ -13,6 +13,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import Unauthorized from "./pages/Unauthorized";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import NotificationBell from "./components/NotificationBell";
 
 function NavBar() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -50,10 +51,11 @@ function NavBar() {
                    Analytics
                  </NavLink>
                ) : null}
-              <span className="text-sm text-gray-600">
-                {user?.name} ({user?.role})
-              </span>
-              <button
+               <span className="text-sm text-gray-600">
+                 {user?.name} ({user?.role})
+               </span>
+               <NotificationBell />
+               <button
                 onClick={logout}
                 className="text-sm text-gray-600 hover:text-gray-800"
               >
