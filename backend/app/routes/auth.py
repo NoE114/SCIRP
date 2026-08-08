@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_from_directory
 from flask_jwt_extended import (
     create_access_token,
     jwt_required,
@@ -7,10 +7,14 @@ from flask_jwt_extended import (
 )
 from datetime import datetime, timedelta
 from functools import wraps
+import os
+import uuid
 from app.extensions import db
 from app.models.user import User, UserRole
 
 auth_bp = Blueprint("auth", __name__)
+
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 
 
 def role_required(*roles):
@@ -37,36 +41,45 @@ def role_required(*roles):
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    data = request.get_json()
-    if not data:
-        return jsonify({"msg": "Missing JSON body"}), 400
-
-    name = data.get("name")
-    email = data.get("email")
-    password = data.get("password")
-    phone = data.get("phone")
-    role_str = data.get("role", "citizen")
+    name = request.form.get("name")
+    email = request.form.get("email")
+    password = request.form.get("password")
+    phone = request.form.get("phone")
 
     if not name or not email or not password:
         return jsonify({"msg": "name, email, and password are required"}), 400
 
-    if role_str not in [r.value for r in UserRole]:
-        return jsonify({"msg": "Invalid role"}), 400
-
     if db.session.query(User).filter_by(email=email).first():
         return jsonify({"msg": "Email already registered"}), 409
+
+    if "id_proof" not in request.files:
+        return jsonify({"msg": "ID proof file is required"}), 400
+
+    file = request.files["id_proof"]
+    if not file or not file.filename:
+        return jsonify({"msg": "No selected ID proof file"}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"):
+        return jsonify({"msg": "Unsupported file format. Please upload a PNG, JPG, or PDF."}), 400
+
+    id_proof_filename = f"id_proof_{uuid.uuid4().hex}{ext}"
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    file.save(os.path.join(UPLOAD_FOLDER, id_proof_filename))
 
     user = User(
         name=name,
         email=email,
         phone=phone,
-        role=UserRole(role_str),
+        role=UserRole.CITIZEN,
+        id_proof_filename=id_proof_filename,
+        is_active=False,
     )
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
 
-    return jsonify({"msg": "User registered", "user": user.to_dict()}), 201
+    return jsonify({"msg": "User registered successfully. Pending administrator approval.", "user": user.to_dict()}), 201
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -85,6 +98,9 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"msg": "Invalid credentials"}), 401
 
+    if not user.is_active:
+        return jsonify({"msg": "Your account is pending approval by an administrator."}), 403
+
     access_token = create_access_token(
         identity=str(user.id),
         additional_claims={"role": user.role.value, "name": user.name},
@@ -94,6 +110,20 @@ def login():
         "access_token": access_token,
         "user": user.to_dict(),
     })
+
+
+@auth_bp.route("/users/<int:user_id>/id-proof", methods=["GET"])
+@jwt_required()
+def get_id_proof(user_id):
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can view ID proofs"}), 403
+
+    user = db.session.get(User, user_id)
+    if not user or not user.id_proof_filename:
+        return jsonify({"msg": "ID proof not found"}), 404
+
+    return send_from_directory(UPLOAD_FOLDER, user.id_proof_filename)
 
 
 @auth_bp.route("/profile", methods=["GET"])

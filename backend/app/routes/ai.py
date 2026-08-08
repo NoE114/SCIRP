@@ -43,10 +43,28 @@ def predict_complaint_priority():
     title = data.get("title", "")
     latitude = data.get("latitude")
     longitude = data.get("longitude")
-
     priority = predict_priority(category, description, title, latitude, longitude)
 
     return jsonify({
         "predicted_priority": priority.value,
         "confidence": "heuristic",
     })
+
+
+@ai_bp.route("/ai/classify", methods=["POST"])
+@jwt_required()
+def classify_issue():
+    data = request.get_json()
+    if not data:
+        return jsonify({"msg": "Missing JSON body"}), 400
+
+    title = data.get("title", "")
+    description = data.get("description", "")
+
+    if not title or not description:
+        return jsonify({"msg": "title and description are required for AI analysis"}), 400
+
+    from app.services.ai import classify_complaint_text
+    suggestions = classify_complaint_text(title, description)
+
+    return jsonify({"suggestions": suggestions})

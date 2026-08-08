@@ -10,6 +10,7 @@ venv/
 # Flask / SQLAlchemy
 instance/
 *.sqlite3
+*.db
 .migrations/
 
 # Environment

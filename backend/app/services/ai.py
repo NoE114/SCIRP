@@ -146,3 +146,107 @@ def predict_priority(category, description, title, latitude=None, longitude=None
         return ComplaintPriority.MEDIUM
     else:
         return ComplaintPriority.LOW
+
+
+def classify_complaint_text(title, description):
+    """
+    Perform heuristic AI analysis on a complaint title and description to suggest
+    category, issue type, department, priority, and generate a short summary.
+    """
+    text = f"{title or ''} {description or ''}".lower()
+
+    # Default values
+    category = "other"
+    issue_type = "General Inquiry"
+    department = "Road"  # Default fallback
+    priority = "medium"
+
+    # Category matching
+    if any(k in text for k in ["pothole", "road", "street", "asphalt", "tar", "crack", "path"]):
+        category = "Road"
+        department = "Road"
+        issue_type = "Pothole / Road Damage"
+    elif any(k in text for k in ["leak", "pipe", "burst", "water supply", "faucet", "valve", "hydrant"]):
+        category = "Water"
+        department = "Water"
+        issue_type = "Pipe Leakage"
+    elif any(k in text for k in ["drain", "sewer", "gutter", "clog", "blocked", "overflow", "stink", "smell"]):
+        category = "Water"
+        department = "Water"
+        issue_type = "Drainage / Sewer Blockage"
+    elif any(k in text for k in ["streetlight", "lamp", "dark", "electricity", "power", "wire", "shock", "electric"]):
+        category = "Electricity"
+        department = "Electricity"
+        issue_type = "Streetlight / Electrical Failure"
+    elif any(k in text for k in ["garbage", "trash", "waste", "dumpster", "refuse", "litter", "bin", "cleanup"]):
+        category = "Sanitation"
+        department = "Sanitation"
+        issue_type = "Garbage Accumulation"
+
+    # Priority determination
+    priority_score = 0
+    if any(k in text for k in ["urgent", "emergency", "immediate", "critical", "danger", "hazard", "risk", "injure", "accident"]):
+        priority_score += 4
+    if any(k in text for k in ["block", "obstruct", "cannot pass", "closed", "shut", "stop", "leak"]):
+        priority_score += 2
+    if len(text.split()) > 30:  # Longer descriptions imply complex/severe issues
+        priority_score += 1
+
+    if priority_score >= 5:
+        priority = "urgent"
+    elif priority_score >= 3:
+        priority = "high"
+    elif priority_score >= 1:
+        priority = "medium"
+    else:
+        priority = "low"
+
+    # Summary generator
+    short_desc = description.strip() if description else ""
+    if len(short_desc) > 80:
+        summary_sentence = short_desc[:80] + "..."
+    else:
+        summary_sentence = short_desc or "No description provided."
+
+    return {
+        "category": category,
+        "issue_type": issue_type,
+        "department": department,
+        "priority": priority,
+        "summary": f"{title}: {summary_sentence}"
+    }
+
+
+def generate_complaint_summary(complaint):
+    """
+    Generate an AI summary, main issue, suggested action, and keywords for a complaint.
+    Returns a dictionary to be displayed on ComplaintDetail for officers.
+    """
+    category = complaint.category or "other"
+    desc = complaint.description or ""
+    title = complaint.title or ""
+
+    # Keywords extraction (simple frequency of non-stopwords)
+    stopwords = {"the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "in", "on", "at", "to", "for", "with", "of", "about"}
+    words = [w.strip(".,!?()\"'") for w in (title + " " + desc).lower().split()]
+    keywords = sorted(list(set([w for w in words if w and w not in stopwords and len(w) > 3])))[:6]
+
+    # Heuristic suggested actions
+    actions = {
+        "Road": "Schedule a road maintenance crew to inspect the asphalt, patch any potholes/cracks, and restore surface safety.",
+        "Water": "Dispatch a pipeline repair technician to isolate the leak location, close the supply valve if necessary, and replace the broken pipe section.",
+        "Electricity": "Dispatch an electrician to inspect transformer connections, replace dead streetlight bulbs, or secure loose high-voltage cables.",
+        "Sanitation": "Arrange for a sanitation crew/garbage collection vehicle to clear the accumulated refuse and clean the surrounding area.",
+        "other": "Schedule an inspector from the municipal grievance redressing cell to perform a site visit and recommend corrective measures."
+    }
+    suggested_action = actions.get(category, actions["other"])
+
+    # Main issue sentence
+    main_issue = f"Reported {category.lower()} issue: '{title}'"
+
+    return {
+        "summary": desc[:150] + "..." if len(desc) > 150 else desc,
+        "main_issue": main_issue,
+        "suggested_action": suggested_action,
+        "keywords": keywords
+    }

@@ -22,11 +22,10 @@ function LocationPicker({ position, setPosition }) {
 }
 
 const CATEGORIES = [
-  "pothole",
-  "garbage",
-  "streetlight",
-  "water_leak",
-  "sanitation",
+  "Road",
+  "Water",
+  "Electricity",
+  "Sanitation",
   "other",
 ];
 
@@ -36,15 +35,16 @@ export default function ReportIssue() {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("pothole");
+  const [category, setCategory] = useState("Road");
   const [priority, setPriority] = useState("medium");
   const [image, setImage] = useState(null);
-  const [position, setPosition] = useState([40.7128, -74.006]);
+  const [position, setPosition] = useState([19.076, 72.877]); // Seeding closer to Mumbai coordinates
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [predictedPriority, setPredictedPriority] = useState(null);
   const [duplicates, setDuplicates] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState(null);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -95,8 +95,9 @@ export default function ReportIssue() {
       return;
     }
     setAnalyzing(true);
+    setAiSuggestions(null);
     try {
-      const [priorityRes, dupRes] = await Promise.all([
+      const [priorityRes, dupRes, classifyRes] = await Promise.all([
         apiRequest("/ai/predict-priority", {
           method: "POST",
           body: JSON.stringify({
@@ -111,141 +112,190 @@ export default function ReportIssue() {
             latitude: position[0], longitude: position[1],
           }),
         }).catch(() => null),
+        apiRequest("/ai/classify", {
+          method: "POST",
+          body: JSON.stringify({ title, description }),
+        }).catch(() => null),
       ]);
 
       if (priorityRes) setPredictedPriority(priorityRes.predicted_priority);
       if (dupRes) setDuplicates(dupRes.duplicates);
+      if (classifyRes && classifyRes.suggestions) {
+        setAiSuggestions(classifyRes.suggestions);
+      }
     } catch (err) {
       console.error(err);
     }
     setAnalyzing(false);
   };
 
-  return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Report an Issue</h1>
+  const applySuggestions = () => {
+    if (!aiSuggestions) return;
+    if (CATEGORIES.includes(aiSuggestions.category)) {
+      setCategory(aiSuggestions.category);
+    } else {
+      setCategory("other");
+    }
+    setPriority(aiSuggestions.priority);
+  };
 
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+  return (
+    <div className="max-w-4xl mx-auto py-6 px-4">
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Report a Civic Complaint</h1>
+        <p className="text-slate-500 text-sm mt-1">Submit issues with location mapping and AI classification helpers.</p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 font-semibold text-sm">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
           <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
+            <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Short Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. Major Pothole on Linking Road"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
+            <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Detailed Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+              placeholder="Provide context, exact street landmarks, or safety risks..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
               rows="4"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c.replace("_", " ").toUpperCase()}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Priority Mode</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p === "auto" ? "AI Auto Predict" : p.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p.toUpperCase()}
-                </option>
-              ))}
-            </select>
-            {predictedPriority && priority === "auto" && (
-              <p className="text-xs text-gray-500 mt-1">
-                AI predicted: <span className="font-medium">{predictedPriority.toUpperCase()}</span>
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Photo</label>
+            <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">Upload Photo</label>
             <input
               type="file"
               accept="image/*"
               onChange={(e) => setImage(e.target.files[0])}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm"
+              className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-slate-100 file:text-slate-700 file:hover:bg-slate-200 cursor-pointer"
             />
           </div>
 
-          <button
-            type="button"
-            onClick={runAIAnalysis}
-            disabled={analyzing || !title || !description}
-            className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {analyzing ? "Analyzing..." : "AI Analyze (Check for Duplicates)"}
-          </button>
+          <div className="pt-2 border-t border-slate-100 space-y-3">
+            <button
+              type="button"
+              onClick={runAIAnalysis}
+              disabled={analyzing || !title || !description}
+              className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              ⚡ {analyzing ? "AI Analyzing..." : "AI Helper (Verify Duplicates & Categories)"}
+            </button>
 
-          {duplicates.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-              <h4 className="font-medium text-yellow-800 mb-2">
-                Potential Duplicates Found ({duplicates.length})
-              </h4>
-              <ul className="space-y-1 text-sm">
-                {duplicates.map((dup) => (
-                  <li key={dup.id} className="text-yellow-700">
-                    #{dup.id} · {dup.distance_m}m away · {dup.created_at} · {" "}
-                    <a
-                      href={`/complaints/${dup.id}`}
-                      className="underline hover:text-yellow-900"
-                    >
-                      View
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-yellow-600 mt-2">
-                Please review these before submitting.
-              </p>
-            </div>
-          )}
+            {aiSuggestions && (
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-4 space-y-2">
+                <h4 className="text-xs font-extrabold text-indigo-900 uppercase tracking-wide flex items-center gap-1.5">
+                  🤖 AI Classification Suggestions
+                </h4>
+                <p className="text-xs text-indigo-700 font-medium">
+                  We identified this as a <span className="font-bold uppercase text-indigo-900">{aiSuggestions.issue_type}</span>.
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs font-bold mt-1.5">
+                  <span className="bg-indigo-100/60 px-2 py-0.5 rounded text-indigo-800">
+                    Category: {aiSuggestions.category}
+                  </span>
+                  <span className="bg-purple-100/60 px-2 py-0.5 rounded text-purple-800 capitalize">
+                    Priority: {aiSuggestions.priority}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={applySuggestions}
+                  className="mt-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 py-1.5 px-3 rounded-lg transition"
+                >
+                  Apply AI Recommendations
+                </button>
+              </div>
+            )}
+
+            {duplicates.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                <h4 className="font-bold text-yellow-800 text-xs uppercase mb-2">
+                  Potential Duplicates Nearby ({duplicates.length})
+                </h4>
+                <ul className="space-y-1.5 text-xs font-medium">
+                  {duplicates.map((dup) => (
+                    <li key={dup.id} className="text-yellow-700 flex justify-between items-center">
+                      <span>#{dup.id} · {dup.distance_m}m away · {dup.created_at}</span>
+                      <a
+                        href={`/complaints/${dup.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline font-bold hover:text-yellow-900"
+                      >
+                        View
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-primary text-white py-2 rounded hover:bg-blue-800 disabled:opacity-50"
+            className="w-full bg-primary hover:bg-blue-800 text-white font-bold py-3 rounded-xl transition shadow-sm disabled:opacity-50"
           >
             {submitting ? "Submitting..." : "Submit Complaint"}
           </button>
         </form>
-
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Pin the location on the map (click to move marker)
+          <label className="block text-xs font-bold uppercase text-slate-400 tracking-wider mb-2">
+            Pin Complaint Location (Click map to move pin)
           </label>
-          <div className="h-80 w-full rounded border">
+          <div className="h-[380px] w-full rounded-2xl border border-slate-100 overflow-hidden shadow-sm relative z-10">
             <MapContainer
               center={position}
-              zoom={13}
+              zoom={12}
               style={{ height: "100%", width: "100%" }}
             >
               <TileLayer
@@ -255,9 +305,10 @@ export default function ReportIssue() {
               <LocationPicker position={position} setPosition={setPosition} />
             </MapContainer>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Latitude: {position[0].toFixed(6)}, Longitude: {position[1].toFixed(6)}
-          </p>
+          <div className="mt-3 bg-slate-50 border border-slate-100 rounded-xl p-3 flex justify-between text-xs text-slate-500 font-semibold">
+            <span>Latitude: {position[0].toFixed(6)}</span>
+            <span>Longitude: {position[1].toFixed(6)}</span>
+          </div>
         </div>
       </div>
     </div>

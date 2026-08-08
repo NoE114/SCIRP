@@ -26,9 +26,10 @@ def test_db():
     db.session.delete(test_user)
     db.session.commit()
 
+    db_type = "SQLite" if db.engine.name == "sqlite" else "MySQL"
     return jsonify({
         "status": "success",
-        "message": "Read/write to MySQL works",
+        "message": f"Read/write to {db_type} works",
         "test_user": fetched.to_dict(),
     })
 

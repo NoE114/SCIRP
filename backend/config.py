@@ -11,7 +11,7 @@ class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL",
-        "mysql+pymysql://scirp_user:scirp_dev_pass@localhost:3306/scirp"
+        "sqlite:///" + os.path.join(os.path.abspath(os.path.dirname(__file__)), "scirp.db")
     )
 
 class ProductionConfig(Config):

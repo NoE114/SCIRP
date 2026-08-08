@@ -20,11 +20,18 @@ const PRIORITY_COLORS = {
 
 export default function MyComplaints() {
   const [complaints, setComplaints] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiRequest("/complaints")
-      .then((res) => setComplaints(res.complaints))
+    Promise.all([
+      apiRequest("/complaints"),
+      apiRequest("/announcements").catch(() => ({ announcements: [] }))
+    ])
+      .then(([compsRes, annRes]) => {
+        setComplaints(compsRes.complaints);
+        setAnnouncements(annRes.announcements || []);
+      })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, []);
@@ -46,8 +53,48 @@ export default function MyComplaints() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold mb-4">My Complaints</h1>
+    <div className="space-y-6 max-w-4xl mx-auto py-6">
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translate3d(100%, 0, 0); }
+          100% { transform: translate3d(-100%, 0, 0); }
+        }
+        .animate-marquee {
+          animation: marquee 30s linear infinite;
+        }
+        .animate-marquee:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">My Complaints</h1>
+        <Link
+          to="/report"
+          className="px-4 py-2 bg-primary hover:bg-blue-800 text-white font-bold text-sm rounded-xl transition shadow-sm"
+        >
+          + Report New Issue
+        </Link>
+      </div>
+
+      {announcements.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-3 flex items-center gap-3 overflow-hidden shadow-md text-white border border-blue-400">
+          <span className="text-lg flex-shrink-0 animate-bounce">📢</span>
+          <div className="flex-1 overflow-hidden relative h-5">
+            <div className="animate-marquee whitespace-nowrap absolute flex gap-12">
+              {announcements.map((ann) => (
+                <span key={ann.id} className="text-sm font-extrabold">
+                  <span className="bg-white/20 px-2 py-0.5 rounded text-white mr-2 text-xs uppercase tracking-wide">
+                    {ann.category} Alert
+                  </span>
+                  {ann.title}: {ann.message}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         {complaints.map((c) => (
           <Link

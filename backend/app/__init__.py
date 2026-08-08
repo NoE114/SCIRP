@@ -14,9 +14,24 @@ def create_app(config_name="default"):
 
     with app.app_context():
         db.create_all()
-        from app.models.department import seed_departments
-        from app.models.department import Department
+        
+        from app.models.department import seed_departments, Department
         if db.session.query(Department).count() == 0:
             seed_departments()
+            
+        from app.models.zone import seed_zones, Zone
+        if db.session.query(Zone).count() == 0:
+            seed_zones()
+            
+        from app.models.ward import seed_wards, Ward
+        if db.session.query(Ward).count() == 0:
+            seed_wards()
+
+        from app.models.sla_config import seed_sla_configs, SlaConfig
+        if db.session.query(SlaConfig).count() == 0:
+            seed_sla_configs()
+        
+        from app.models.user import seed_users
+        seed_users()
 
     return app

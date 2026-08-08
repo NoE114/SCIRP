@@ -162,3 +162,128 @@ def flag_spam(complaint_id):
     db.session.commit()
 
     return jsonify({"msg": "Complaint updated", "is_spam": complaint.is_spam}), 200
+
+
+@admin_bp.route("/users/<int:user_id>", methods=["DELETE"])
+@jwt_required()
+def delete_user(user_id):
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can delete users"}), 403
+
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+
+    # Prevent deleting oneself
+    current_admin_id = int(get_jwt_identity())
+    if user.id == current_admin_id:
+        return jsonify({"msg": "You cannot delete your own admin account"}), 400
+
+    from app.models.notification import Notification
+    from app.models.complaint import Complaint
+    from app.models.complaint_log import ComplaintLog
+
+    # 1. Delete notifications sent to this user
+    Notification.query.filter_by(user_id=user_id).delete()
+
+    # 2. Nullify officer reference in complaint logs
+    ComplaintLog.query.filter_by(officer_id=user_id).update({ComplaintLog.officer_id: None})
+
+    # 3. Handle complaints filed by this user (if any)
+    user_complaints = Complaint.query.filter_by(user_id=user_id).all()
+    for c in user_complaints:
+        # Delete logs for this complaint
+        ComplaintLog.query.filter_by(complaint_id=c.id).delete()
+        # Delete notifications referencing this complaint
+        Notification.query.filter_by(related_complaint_id=c.id).delete()
+        # Delete the complaint
+        db.session.delete(c)
+
+    # 4. Delete the user
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({"msg": "User account and all related records deleted successfully"}), 200
+
+
+@admin_bp.route("/sla/configs", methods=["GET"])
+@jwt_required()
+def list_sla_configs():
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can view SLA configurations"}), 403
+
+    from app.models.sla_config import SlaConfig
+    configs = db.session.query(SlaConfig).all()
+    return jsonify({"configs": [c.to_dict() for c in configs]})
+
+
+@admin_bp.route("/sla/configs/<string:priority>", methods=["PUT"])
+@jwt_required()
+def update_sla_config(priority):
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can update SLA configurations"}), 403
+
+    from app.models.sla_config import SlaConfig
+    config = db.session.get(SlaConfig, priority)
+    if not config:
+        return jsonify({"msg": "SlaConfig not found"}), 404
+
+    data = request.get_json()
+    if not data or "duration_hours" not in data:
+        return jsonify({"msg": "duration_hours is required"}), 400
+
+    try:
+        hours = int(data["duration_hours"])
+        if hours <= 0:
+            raise ValueError()
+    except ValueError:
+        return jsonify({"msg": "duration_hours must be a positive integer"}), 400
+
+    old_hours = config.duration_hours
+    config.duration_hours = hours
+    db.session.commit()
+
+    # Log Audit Trail
+    from app.services.audit import log_audit_event
+    log_audit_event(
+        user_id=int(get_jwt_identity()),
+        action="update_sla",
+        entity_type="sla_config",
+        entity_id=None,
+        old_value=str(old_hours),
+        new_value=str(hours),
+        metadata={"priority": priority}
+    )
+
+    return jsonify({"msg": "SLA config updated", "config": config.to_dict()})
+
+
+@admin_bp.route("/audit-logs", methods=["GET"])
+@jwt_required()
+def get_audit_logs():
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can access audit logs"}), 403
+
+    from app.models.audit_log import AuditLog
+    logs = db.session.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(100).all()
+    return jsonify({"audit_logs": [log.to_dict() for log in logs]})
+
+
+@admin_bp.route("/sla/trigger-escalations", methods=["POST"])
+@jwt_required()
+def force_trigger_escalations():
+    """
+    Manual override endpoint for admins/cron to run the SLA escalations checking job.
+    """
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"msg": "Only admins can trigger manual SLA check"}), 403
+
+    from app.services.sla import run_sla_escalations
+    escalated_count = run_sla_escalations()
+    return jsonify({"msg": "SLA escalation check completed", "escalated_count": escalated_count}), 200
+

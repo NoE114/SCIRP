@@ -33,10 +33,10 @@ export function AuthProvider({ children }) {
     return res;
   };
 
-  const register = async (name, email, password, phone, role) => {
+  const register = async (formData) => {
     const res = await apiRequest("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ name, email, password, phone, role }),
+      body: formData,
     });
     return res;
   };
