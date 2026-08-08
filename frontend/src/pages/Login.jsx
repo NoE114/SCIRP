@@ -97,29 +97,29 @@ export default function Login() {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => handleQuickLogin("citizen@civicpulse.com", "citizenpass123")}
+            onClick={() => handleQuickLogin("ashish@civicpulse.com", "citizenpass123")}
             className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:ring-2 hover:ring-blue-50 hover:shadow-sm transition text-center"
           >
             <span className="text-xs font-bold text-slate-800">Citizen</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">citizen@civicpulse.com</span>
+            <span className="text-[10px] text-slate-400 mt-0.5">ashish@civicpulse.com</span>
           </button>
 
           <button
             type="button"
-            onClick={() => handleQuickLogin("officer1@civicpulse.com", "officerpass123")}
+            onClick={() => handleQuickLogin("john@civicpulse.com", "officerpass123")}
             className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:ring-2 hover:ring-blue-50 hover:shadow-sm transition text-center"
           >
             <span className="text-xs font-bold text-slate-800">Officer (Roads)</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">officer1@civicpulse.com</span>
+            <span className="text-[10px] text-slate-400 mt-0.5">john@civicpulse.com</span>
           </button>
 
           <button
             type="button"
-            onClick={() => handleQuickLogin("officer2@civicpulse.com", "officerpass123")}
+            onClick={() => handleQuickLogin("sarah@civicpulse.com", "officerpass123")}
             className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:ring-2 hover:ring-blue-50 hover:shadow-sm transition text-center"
           >
             <span className="text-xs font-bold text-slate-800">Officer (Water)</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">officer2@civicpulse.com</span>
+            <span className="text-[10px] text-slate-400 mt-0.5">sarah@civicpulse.com</span>
           </button>
 
           <button
