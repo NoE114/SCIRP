@@ -1,0 +1,43 @@
+# Example nginx config for a self-hosted CivicPulse deployment.
+# Serves the built frontend (frontend/dist) and reverse-proxies /api to the
+# Flask backend on 127.0.0.1:5000. Assumes the backend runs under gunicorn
+# (single worker; see Procfile) and that APP_ENV=production is set for it.
+#
+# Usage: copy to /etc/nginx/sites-available/civicpulse, symlink into
+# sites-enabled, replace the two server_name lines, then `nginx -t && reload`.
+
+server {
+    listen 80;
+    server_name civicpulse.example.com;          # <-- replace
+
+    # SPA static assets (long client cache for hashed files)
+    root /home/noe/SCIRP/frontend/dist;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    # API — proxied to gunicorn/Flask. Request body sized for file uploads.
+    location /api/ {
+        client_max_body_size 10m;
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        # Long SSE / stream timeouts for the public tracker
+        proxy_read_timeout 3600s;
+        proxy_buffering off;
+    }
+
+    # SPA fallback — unknown routes return index.html so react-router works
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Never serve uploads or backend config from the frontend root
+    location ~ ^/(backend|\.env|\.git) {
+        return 403;
+    }
+}

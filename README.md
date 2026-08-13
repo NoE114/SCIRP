@@ -25,9 +25,9 @@ CivicPulse is a full-stack, state-of-the-art civic complaint redressal and geo-r
 | :--- | :--- | :--- | :--- |
 | **System Admin** | `admin@civicpulse.com` | `adminpass123` | Global System Access |
 | **Department Head** | `depthead@civicpulse.com` | `deptpass123` | Road Department |
-| **Officer (Roads)** | `officer1@civicpulse.com` | `officerpass123` | Road / Ward 1 |
-| **Officer (Water)** | `officer2@civicpulse.com` | `officerpass123` | Water / Ward 2 |
-| **Citizen** | `citizen@civicpulse.com` | `citizenpass123` | Ward 1 (Airport Area) |
+| **Officer (Roads)** | `john@civicpulse.com` | `officerpass123` | Road / Ward 1 |
+| **Officer (Water)** | `sarah@civicpulse.com` | `officerpass123` | Water / Ward 2 |
+| **Citizen** | `ashish@civicpulse.com` | `citizenpass123` | Ward 1 (Airport Area) |
 
 ---
 
@@ -72,3 +72,57 @@ CivicPulse is a full-stack, state-of-the-art civic complaint redressal and geo-r
    npm run dev
    ```
    *Open `http://localhost:5173` to access the platform. Use the **Demo Accounts Portal** at the bottom of the sign-in page to quickly test any role.*
+
+### 3. Password Reset (development)
+With no SMTP configured, the reset token is printed to the backend console in `DEBUG` mode only:
+1. `POST /api/auth/forgot-password` with `{"email": "..."}` — the token appears in the console log.
+2. `POST /api/auth/reset-password` with `{"token": "...", "password": "..."}`. Each token is single-use and expires after 1 hour.
+
+---
+
+## Configuration
+
+The backend selects its config from `APP_ENV` (or `FLASK_ENV`): `development` (default), `testing`, or `production`.
+
+| Variable | Required | Notes |
+| :--- | :--- | :--- |
+| `APP_ENV` | no | `development` / `testing` / `production` |
+| `SECRET_KEY` | **yes (prod)** | Flask session signing key |
+| `JWT_SECRET_KEY` | **yes (prod)** | JWT signing key |
+| `DATABASE_URL` | **yes (prod)** | e.g. `postgresql://user:pass@host:5432/db` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | no | Enable real notification emails; else dev prints to console (DEBUG only) |
+
+Production is **fail-fast**: `create_app()` raises `RuntimeError` at startup if the required secrets/DB URL are missing or still set to the known development defaults.
+
+### Production security posture
+- `DEBUG=False`, `SEED_DEMO_USERS=False`, force-secure cookies.
+- No `/api/test-db` or dev-only routes registered in production.
+- Password-reset tokens are opaque, signed, time-limited, and single-use (stored as SHA-256 hashes). They cannot be used as JWTs.
+- Complaint images, proof images, and ID proofs are served only to authorized users (`@jwt_required()` + role/ownership checks).
+- Login, register, forgot-password, and reset-password are rate-limited per IP.
+- Uploaded files are validated by extension **and** magic bytes.
+- JWT roles are re-validated against the DB on every request, so demoted/deactivated users lose access immediately.
+
+---
+
+## Deployment
+
+### Render (recommended)
+`render.yaml` defines two services — a Python **API** (`civicpulse-api`) and a static **UI** (`civicpulse-ui`) — plus the root `Procfile`.
+1. Push this repo to GitHub and create a **New → Blueprint** app on Render.
+2. In the API service, set `DATABASE_URL` manually (PostgreSQL add-on or MariaDB), `SECRET_KEY`, and `JWT_SECRET_KEY` (auto-generated if left blank).
+3. Render sets `APP_ENV=production` automatically. No test/dev routes are registered.
+4. The UI service builds `frontend/dist` and proxies `/api/*` to the API service. Set `VITE_ENABLE_DEMO_ACCOUNTS=false` so the demo login panel is hidden.
+
+> **Note**: The app uses a single gunicorn worker (see `Procfile`) intentionally — in-memory SSE broadcasts and the rate limiter assume one process. If you scale up, switch the notification streaming and rate limiting to a Redis-backed implementation.
+
+### Self-hosted (nginx)
+1. Build the frontend: `cd frontend && npm ci && npm run build`.
+2. Run the backend with gunicorn: `cd backend && gunicorn --bind 127.0.0.1:5000 --workers 1 --threads 4 wsgi:app` (set `APP_ENV=production` and secrets).
+3. Serve with `nginx.conf.example` (SPA fallback + `/api` reverse proxy + security headers).
+
+---
+
+## Recreating the test suites
+
+The pytest and Vitest suites were recreated outside this repo's history on a divergent branch (`b42a7f9`). When adding tests back here, place Flask tests under `backend/tests/` and frontend component tests under `frontend/src/__tests__/`, and pin dependencies (`requirements-dev.txt`, `devDependencies`).

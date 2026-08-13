@@ -98,7 +98,7 @@ export default function MapDashboard() {
         }
       }
       if (!found) {
-        clusters.append({ lat: c.latitude, lng: c.longitude, count: 1 });
+        clusters.push({ lat: c.latitude, lng: c.longitude, count: 1 });
       }
     });
 

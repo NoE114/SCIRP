@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.extensions import db
 from app.models.announcement import Announcement
 from app.models.user import User, UserRole
@@ -34,11 +34,11 @@ def list_announcements():
 @announcements_bp.route("/announcements", methods=["POST"])
 @jwt_required()
 def create_announcement():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can post announcements"}), 403
 
-    user_id = int(get_jwt_identity())
     data = request.get_json()
     if not data or not data.get("title") or not data.get("message"):
         return jsonify({"msg": "title and message are required"}), 400

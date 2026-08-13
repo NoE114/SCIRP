@@ -8,7 +8,7 @@ from flask import (
     send_from_directory,
     current_app,
 )
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
@@ -34,8 +34,8 @@ def list_departments():
 @departments_bp.route("/departments", methods=["POST"])
 @jwt_required()
 def create_department():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can create departments"}), 403
 
     data = request.get_json()
@@ -84,8 +84,8 @@ def list_zones():
 @departments_bp.route("/zones", methods=["POST"])
 @jwt_required()
 def create_zone():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can create zones"}), 403
 
     from app.models.zone import Zone
@@ -113,8 +113,8 @@ def list_wards():
 @departments_bp.route("/wards", methods=["POST"])
 @jwt_required()
 def create_ward():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can create wards"}), 403
 
     from app.models.ward import Ward

@@ -2,11 +2,16 @@ import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
+const DEMO_ACCOUNTS_ENABLED = import.meta.env.VITE_ENABLE_DEMO_ACCOUNTS === "true";
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/";
+  const from =
+    new URLSearchParams(location.search).get("redirect") ||
+    location.state?.from?.pathname ||
+    "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -88,8 +93,9 @@ export default function Login() {
         </p>
       </div>
 
-      {/* Demo Accounts Panel */}
-      <div className="p-6 bg-slate-50 border border-slate-200/50 rounded-2xl space-y-4">
+      {/* Demo Accounts Panel — only rendered when the build enables it */}
+      {DEMO_ACCOUNTS_ENABLED && (
+        <div className="p-6 bg-slate-50 border border-slate-200/50 rounded-2xl space-y-4">
         <div className="text-center space-y-1">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Demo Accounts Portal</h3>
           <p className="text-[11px] text-slate-400">Click a portal below to sign in instantly with a pre-configured role</p>
@@ -140,7 +146,8 @@ export default function Login() {
             <span className="text-[10px] text-slate-400 mt-0.5">admin@civicpulse.com</span>
           </button>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

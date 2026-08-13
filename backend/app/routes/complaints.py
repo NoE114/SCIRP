@@ -62,8 +62,10 @@ def is_valid_transition(old_status, new_status, role):
 @jwt_required()
 def create_complaint():
     user_id = int(get_jwt_identity())
-    claims = get_jwt()
-    user_name = claims.get("name", "Unknown")
+    user = db.session.get(User, user_id)
+    if not user or not user.is_active:
+        return jsonify({"msg": "Account is not active or no longer exists"}), 401
+    user_name = user.name
 
     title = request.form.get("title")
     description = request.form.get("description")
@@ -92,9 +94,11 @@ def create_complaint():
     if "image" in request.files:
         file = request.files["image"]
         if file and file.filename:
+            from app.services.uploads import file_matches_ext
+            ok, msg = file_matches_ext(file, {".jpg", ".jpeg", ".png", ".gif", ".webp"})
+            if not ok:
+                return jsonify({"msg": msg}), 400
             ext = os.path.splitext(file.filename)[1].lower()
-            if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
-                return jsonify({"msg": "Unsupported image format"}), 400
             image_filename = f"{uuid.uuid4().hex}{ext}"
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
             file.save(os.path.join(UPLOAD_FOLDER, image_filename))
@@ -244,12 +248,16 @@ def create_complaint():
 def list_complaints():
     user_id = int(get_jwt_identity())
     user = db.session.get(User, user_id)
+    if not user or not user.is_active:
+        return jsonify({"msg": "Account is not active or no longer exists"}), 401
 
     query = Complaint.query
 
     if user.role == UserRole.CITIZEN:
         query = query.filter_by(user_id=user_id)
-    elif user.role == UserRole.OFFICER:
+    elif user.role in (UserRole.OFFICER, UserRole.DEPT_HEAD):
+        if not user.department_id:
+            return jsonify({"complaints": []}), 200
         query = query.filter_by(department_id=user.department_id)
     elif user.role == UserRole.ADMIN:
         pass
@@ -261,9 +269,21 @@ def list_complaints():
 @complaints_bp.route("/<int:complaint_id>", methods=["GET"])
 @jwt_required()
 def get_complaint(complaint_id):
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
     complaint = db.session.get(Complaint, complaint_id)
     if not complaint:
         return jsonify({"msg": "Complaint not found"}), 404
+
+    # Citizens may only read their own complaints; staff may read within
+    # their department (admins dept heads see everything).
+    if user.role == UserRole.CITIZEN and complaint.user_id != user_id:
+        return jsonify({"msg": "You do not have permission to view this complaint"}), 403
+    if user.role == UserRole.OFFICER:
+        if not user.department_id:
+            return jsonify({"msg": "You do not have permission to view this complaint"}), 403
+        if complaint.department_id != user.department_id:
+            return jsonify({"msg": "You do not have permission to view this complaint"}), 403
 
     logs = (
         db.session.query(ComplaintLog)
@@ -314,23 +334,31 @@ def get_complaint(complaint_id):
 def update_complaint(complaint_id):
     user_id = int(get_jwt_identity())
     user = db.session.get(User, user_id)
-    claims = get_jwt()
-    role = claims.get("role")
+    role = user.role.value
 
     if role not in ("officer", "dept_head", "admin"):
         return jsonify({"msg": "Only officers, department heads, and admins can update complaints"}), 403
+
+    if not user.is_active:
+        return jsonify({"msg": "Account is not active"}), 401
 
     complaint = db.session.get(Complaint, complaint_id)
     if not complaint:
         return jsonify({"msg": "Complaint not found"}), 404
 
     # Department Heads can only edit complaints in their department
-    if role == "dept_head" and user.department_id and complaint.department_id != user.department_id:
-        return jsonify({"msg": "Department heads can only manage complaints within their department"}), 403
+    if role == "dept_head":
+        if not user.department_id:
+            return jsonify({"msg": "Your account has no department assigned"}), 403
+        if complaint.department_id != user.department_id:
+            return jsonify({"msg": "Department heads can only manage complaints within their department"}), 403
 
     # Officers can only edit complaints assigned to their department
-    if role == "officer" and user.department_id and complaint.department_id != user.department_id:
-        return jsonify({"msg": "Officers can only manage complaints within their department"}), 403
+    if role == "officer":
+        if not user.department_id:
+            return jsonify({"msg": "Your account has no department assigned"}), 403
+        if complaint.department_id != user.department_id:
+            return jsonify({"msg": "Officers can only manage complaints within their department"}), 403
 
     data = request.get_json()
     if not data:
@@ -522,26 +550,28 @@ def update_complaint(complaint_id):
     })
 
 
-    return send_from_directory(
-        UPLOAD_FOLDER,
-        complaint.image_filename,
-    )
-
-
 @complaints_bp.route("/<int:complaint_id>/proof", methods=["POST"])
 @jwt_required()
 def upload_proof(complaint_id):
     user_id = int(get_jwt_identity())
     user = db.session.get(User, user_id)
-    claims = get_jwt()
-    role = claims.get("role")
+    role = user.role.value
 
     if role not in ("officer", "admin", "dept_head"):
         return jsonify({"msg": "Only officers, department heads, and admins can upload proof"}), 403
 
+    if not user.is_active:
+        return jsonify({"msg": "Account is not active"}), 401
+
     complaint = db.session.get(Complaint, complaint_id)
     if not complaint:
         return jsonify({"msg": "Complaint not found"}), 404
+
+    if role in ("officer", "dept_head"):
+        if not user.department_id:
+            return jsonify({"msg": "Your account has no department assigned"}), 403
+        if complaint.department_id != user.department_id:
+            return jsonify({"msg": "You can only upload proof for complaints in your department"}), 403
 
     if "image" not in request.files:
         return jsonify({"msg": "No image provided"}), 400
@@ -550,9 +580,12 @@ def upload_proof(complaint_id):
     if not file or not file.filename:
         return jsonify({"msg": "No image selected"}), 400
 
+    from app.services.uploads import file_matches_ext
+    ok, msg = file_matches_ext(file, {".jpg", ".jpeg", ".png", ".gif", ".webp"})
+    if not ok:
+        return jsonify({"msg": msg}), 400
+
     ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
-        return jsonify({"msg": "Unsupported image format"}), 400
 
     proof_filename = f"proof_{uuid.uuid4().hex}{ext}"
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -617,11 +650,53 @@ def upload_proof(complaint_id):
     }), 200
 
 
+@complaints_bp.route("/<int:complaint_id>/image", methods=["GET"])
+@jwt_required()
+def get_complaint_image(complaint_id):
+    """Serve the citizen's attached complaint image.
+
+    Only the owning citizen (or any officer/admin/dept_head) may view it.
+    """
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    allowed_roles = (UserRole.OFFICER, UserRole.DEPT_HEAD, UserRole.ADMIN)
+    complaint = db.session.get(Complaint, complaint_id)
+    if not complaint or not complaint.image_filename:
+        return jsonify({"msg": "Image not found"}), 404
+
+    if user.role not in allowed_roles and complaint.user_id != user_id:
+        return jsonify({"msg": "You do not have permission to view this image"}), 403
+
+    return send_from_directory(
+        UPLOAD_FOLDER,
+        complaint.image_filename,
+    )
+
+
 @complaints_bp.route("/<int:complaint_id>/proof-image", methods=["GET"])
+@jwt_required()
 def get_complaint_proof_image(complaint_id):
+    """Serve resolution-proof images, restricted to authorized parties.
+
+    Officers can view proofs for complaints in their own department; dept
+    heads/admins can view any; the owning citizen can view their own.
+    """
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+
     complaint = db.session.get(Complaint, complaint_id)
     if not complaint or not complaint.proof_image_filename:
         return jsonify({"msg": "Proof image not found"}), 404
+
+    if user.role == UserRole.ADMIN or user.role == UserRole.DEPT_HEAD:
+        pass  # full access
+    elif user.role == UserRole.OFFICER:
+        if user.department_id and complaint.department_id != user.department_id:
+            return jsonify({"msg": "You do not have permission to view this proof"}), 403
+    elif complaint.user_id != user_id:
+        return jsonify({"msg": "You do not have permission to view this proof"}), 403
+    else:
+        return jsonify({"msg": "You do not have permission to view this proof"}), 403
 
     return send_from_directory(
         UPLOAD_FOLDER,

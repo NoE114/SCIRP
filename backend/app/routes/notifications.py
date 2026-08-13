@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from email.mime.text import MIMEText
 
-from flask import Blueprint, request, jsonify, Response, stream_with_context
+from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 from app.extensions import db
@@ -25,7 +25,10 @@ def _send_email(recipient_email, subject, body):
     smtp_pass = os.environ.get("SMTP_PASS")
 
     if not smtp_host:
-        print(f"[DEV EMAIL] To: {recipient_email}\nSubject: {subject}\n{body}")
+        # Development-only fallback: print so local testing can see it.
+        # Never print in production — emails contain user PII.
+        if current_app.config.get("DEBUG"):
+            print(f"[DEV EMAIL] To: {recipient_email}\nSubject: {subject}\n{body}")
         return
 
     msg = MIMEText(body)
@@ -40,7 +43,7 @@ def _send_email(recipient_email, subject, body):
                 server.login(smtp_user, smtp_pass)
             server.send_message(msg)
     except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
+        current_app.logger.error(f"[EMAIL ERROR] {e}")
 
 
 def _broadcast_notification(user_id, notification_data):

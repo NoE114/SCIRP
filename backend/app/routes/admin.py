@@ -2,7 +2,7 @@ from collections import Counter
 from datetime import datetime
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
@@ -17,8 +17,8 @@ admin_bp = Blueprint("admin", __name__)
 @admin_bp.route("/dashboard", methods=["GET"])
 @jwt_required()
 def dashboard():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can access the dashboard"}), 403
 
     users = db.session.query(User).all()
@@ -56,8 +56,8 @@ def dashboard():
 @admin_bp.route("/officer", methods=["POST"])
 @jwt_required()
 def create_officer():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can create officers"}), 403
 
     data = request.get_json()
@@ -98,8 +98,8 @@ def create_officer():
 @admin_bp.route("/users", methods=["GET"])
 @jwt_required()
 def list_users():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can list users"}), 403
 
     users = db.session.query(User).all()
@@ -109,8 +109,8 @@ def list_users():
 @admin_bp.route("/users/<int:user_id>", methods=["PUT"])
 @jwt_required()
 def update_user(user_id):
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can update users"}), 403
 
     user = db.session.get(User, user_id)
@@ -147,8 +147,8 @@ def update_user(user_id):
 @admin_bp.route("/complaints/<int:complaint_id>/spam", methods=["PUT"])
 @jwt_required()
 def flag_spam(complaint_id):
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can flag complaints"}), 403
 
     complaint = db.session.get(Complaint, complaint_id)
@@ -167,8 +167,8 @@ def flag_spam(complaint_id):
 @admin_bp.route("/users/<int:user_id>", methods=["DELETE"])
 @jwt_required()
 def delete_user(user_id):
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can delete users"}), 403
 
     user = db.session.get(User, user_id)
@@ -210,8 +210,8 @@ def delete_user(user_id):
 @admin_bp.route("/sla/configs", methods=["GET"])
 @jwt_required()
 def list_sla_configs():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can view SLA configurations"}), 403
 
     from app.models.sla_config import SlaConfig
@@ -222,8 +222,8 @@ def list_sla_configs():
 @admin_bp.route("/sla/configs/<string:priority>", methods=["PUT"])
 @jwt_required()
 def update_sla_config(priority):
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can update SLA configurations"}), 403
 
     from app.models.sla_config import SlaConfig
@@ -264,8 +264,8 @@ def update_sla_config(priority):
 @admin_bp.route("/audit-logs", methods=["GET"])
 @jwt_required()
 def get_audit_logs():
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can access audit logs"}), 403
 
     from app.models.audit_log import AuditLog
@@ -279,8 +279,8 @@ def force_trigger_escalations():
     """
     Manual override endpoint for admins/cron to run the SLA escalations checking job.
     """
-    claims = get_jwt()
-    if claims.get("role") != "admin":
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role != UserRole.ADMIN:
         return jsonify({"msg": "Only admins can trigger manual SLA check"}), 403
 
     from app.services.sla import run_sla_escalations

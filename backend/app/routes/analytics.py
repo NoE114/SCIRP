@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required, get_jwt
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import func, case, extract
 
 from app.extensions import db
 from app.models.complaint import Complaint, ComplaintStatus
 from app.models.complaint_log import ComplaintLog
 from app.models.department import Department
+from app.models.user import User, UserRole
 
 analytics_bp = Blueprint("analytics", __name__)
 
@@ -15,8 +16,8 @@ analytics_bp = Blueprint("analytics", __name__)
 @analytics_bp.route("/analytics/dashboard", methods=["GET"])
 @jwt_required()
 def analytics_dashboard():
-    claims = get_jwt()
-    if claims.get("role") not in ("admin", "dept_head"):
+    user = db.session.get(User, int(get_jwt_identity()))
+    if not user or not user.is_active or user.role not in (UserRole.ADMIN, UserRole.DEPT_HEAD):
         return jsonify({"msg": "Only admins and department heads can access analytics"}), 403
 
     now = datetime.utcnow()
@@ -144,7 +145,6 @@ def analytics_dashboard():
         ward_distribution.append({"ward": name, "count": count})
 
     # --- 4. Officer Workloads ---
-    from app.models.user import User, UserRole
     officers = User.query.filter_by(role=UserRole.OFFICER, is_active=True).all()
     officer_workloads = []
     for off in officers:

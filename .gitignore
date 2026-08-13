@@ -18,8 +18,9 @@ instance/
 .env.local
 
 # Uploads
-uploads/*
-!uploads/.gitkeep
+backend/uploads/*
+backend/uploads/**/*
+!backend/uploads/.gitkeep
 
 # Frontend
 node_modules/

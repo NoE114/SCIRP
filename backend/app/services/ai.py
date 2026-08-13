@@ -96,7 +96,6 @@ def detect_duplicates(latitude, longitude, category, description, title, current
         if category_match and (overlap >= 2 or distance < 100):
             duplicates.append({
                 "id": c.id,
-                "title": c.title,
                 "distance_m": round(distance, 1),
                 "created_at": c.created_at.isoformat(),
                 "category": c.category,

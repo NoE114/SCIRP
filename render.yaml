@@ -1,0 +1,53 @@
+# Render blueprint for CivicPulse. On Render, create a "New → Blueprint".
+# The web service runs the Flask API via gunicorn (see Procfile).
+#
+# NOTE: The app serves the REST API only. Static assets / SPA are served by
+# the separate static site (render.yaml below) which proxies /api to this
+# service over the internal network.
+
+services:
+  - type: web
+    name: civicpulse-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 wsgi:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # set manually (PostgreSQL/MariaDB URI)
+      - key: PYTHON_VERSION
+        value: "3.13"
+
+  # Static SPA (nginx) — deploys frontend/dist and proxies /api to the API.
+  - type: web
+    name: civicpulse-ui
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    routes:
+      - type: rewrite
+        source: /api/*
+        dest: https://civicpulse-api.onrender.com/api/*
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    envVars:
+      - key: VITE_API_BASE
+        value: /api
+      - key: VITE_ENABLE_DEMO_ACCOUNTS
+        value: "false"

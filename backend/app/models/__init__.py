@@ -10,6 +10,7 @@ from app.models.audit_log import AuditLog
 from app.models.complaint_cluster import ComplaintCluster
 from app.models.complaint_confirmation import ComplaintConfirmation
 from app.models.announcement import Announcement
+from app.models.password_reset_token import PasswordResetToken
 
 __all__ = [
     "User",
