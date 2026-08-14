@@ -23,6 +23,8 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false # set manually (PostgreSQL/MariaDB URI)
+      - key: CORS_ORIGINS
+        value: https://scirp-1.onrender.com,https://scirp.onrender.com
       - key: PYTHON_VERSION
         value: "3.13"
 

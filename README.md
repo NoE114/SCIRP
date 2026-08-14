@@ -90,6 +90,7 @@ The backend selects its config from `APP_ENV` (or `FLASK_ENV`): `development` (d
 | `SECRET_KEY` | **yes (prod)** | Flask session signing key |
 | `JWT_SECRET_KEY` | **yes (prod)** | JWT signing key |
 | `DATABASE_URL` | **yes (prod)** | e.g. `postgresql://user:pass@host:5432/db` |
+| `CORS_ORIGINS` | no | Comma-separated allowed frontend origins (defaults: Render frontend + localhost) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | no | Enable real notification emails; else dev prints to console (DEBUG only) |
 
 Production is **fail-fast**: `create_app()` raises `RuntimeError` at startup if the required secrets/DB URL are missing or still set to the known development defaults.

@@ -31,6 +31,8 @@ def create_app(config_name=None):
     db.init_app(app)
     jwt.init_app(app)
 
+    _configure_cors(app)
+
     from app.routes import register_routes
     register_routes(app)
 
@@ -104,3 +106,30 @@ def _register_error_handlers(app):
     def server_error(e):
         app.logger.error("Unhandled error: %s", e)
         return jsonify({"msg": "Internal server error"}), 500
+
+
+def _configure_cors(app):
+    """Enable CORS for the API.
+
+    Allowed origins come from the CORS_ORIGINS env var (comma-separated);
+    if unset, a safe default list is used. Add your frontend domain(s) there
+    or in the default list below.
+    """
+    import os
+
+    default_origins = [
+        "https://scirp-1.onrender.com",
+        "https://scirp.onrender.com",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    raw = os.environ.get("CORS_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()] if raw else default_origins
+
+    from flask_cors import CORS
+
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": origins}},
+        supports_credentials=True,
+    )
