@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-const DEMO_ACCOUNTS_ENABLED = import.meta.env.VITE_ENABLE_DEMO_ACCOUNTS === "true";
+const DEMO_ACCOUNTS_ENABLED = true;
 
 export default function Login() {
   const { login } = useAuth();
