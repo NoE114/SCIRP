@@ -127,7 +127,219 @@ class Complaint(db.Model):
             "proof_remarks": self.proof_remarks,
             "proof_latitude": float(self.proof_latitude) if self.proof_latitude else None,
             "proof_longitude": float(self.proof_longitude) if self.proof_longitude else None,
-            "officer_id": self.officer_id,
-            "officer_name": self.assigned_officer.name if self.assigned_officer else None,
             "upvotes": upvotes_count,
         }
+
+
+def seed_complaints():
+    from app.extensions import db
+    from app.models.user import User
+    from app.models.department import Department
+    from app.models.ward import Ward
+    from app.models.zone import Zone
+    from app.models.complaint import Complaint, ComplaintStatus, ComplaintPriority
+    from datetime import datetime, timedelta
+
+    if db.session.query(Complaint).count() > 0:
+        return
+
+    citizen = db.session.query(User).filter_by(email="ashish@civicpulse.com").first()
+    if not citizen:
+        return
+
+    john = db.session.query(User).filter_by(email="john@civicpulse.com").first()
+    sarah = db.session.query(User).filter_by(email="sarah@civicpulse.com").first()
+    mike = db.session.query(User).filter_by(email="officer3@civicpulse.com").first()
+    clara = db.session.query(User).filter_by(email="officer4@civicpulse.com").first()
+
+    road_dept = db.session.query(Department).filter_by(name="Road").first()
+    water_dept = db.session.query(Department).filter_by(name="Water").first()
+    elec_dept = db.session.query(Department).filter_by(name="Electricity").first()
+    sani_dept = db.session.query(Department).filter_by(name="Sanitation").first()
+
+    ward_1 = db.session.query(Ward).filter_by(name="Ward 1 (Airport Area)").first()
+    ward_3 = db.session.query(Ward).filter_by(name="Ward 3 (Colaba)").first()
+    ward_5 = db.session.query(Ward).filter_by(name="Ward 5 (Chembur)").first()
+    ward_7 = db.session.query(Ward).filter_by(name="Ward 7 (Bandra)").first()
+
+    now = datetime.utcnow()
+
+    complaints_data = [
+        {
+            "title": "Severe Pothole on main airport road",
+            "description": "A very deep pothole has formed near the airport entry gate, causing severe traffic issues and damage to cars.",
+            "category": "road",
+            "latitude": 19.0898,
+            "longitude": 72.8658,
+            "priority": ComplaintPriority.HIGH,
+            "status": ComplaintStatus.RESOLVED,
+            "created_at": now - timedelta(days=15),
+            "updated_at": now - timedelta(days=13),
+            "department": road_dept,
+            "ward": ward_1,
+            "zone": ward_1.zone if ward_1 else None,
+            "officer": john,
+            "tracking_id": "CMP-MUM-2026-100001",
+            "rating": 5,
+            "feedback": "Pothole was completely filled and road leveled. Very prompt work by the team!",
+            "satisfaction_status": "satisfied",
+            "proof_remarks": "Pothole filled with concrete mix and steamrolled.",
+            "proof_uploaded_at": now - timedelta(days=13),
+        },
+        {
+            "title": "Broken street pavement blocks",
+            "description": "Several pavement tiles are completely shattered near terminal 2 pathway, making it hazardous for pedestrians.",
+            "category": "road",
+            "latitude": 19.0880,
+            "longitude": 72.8670,
+            "priority": ComplaintPriority.MEDIUM,
+            "status": ComplaintStatus.IN_PROGRESS,
+            "created_at": now - timedelta(days=3),
+            "updated_at": now - timedelta(days=1),
+            "department": road_dept,
+            "ward": ward_1,
+            "zone": ward_1.zone if ward_1 else None,
+            "officer": john,
+            "tracking_id": "CMP-MUM-2026-100002",
+        },
+        {
+            "title": "Major pipe leakage near Marine Drive",
+            "description": "Drinking water is spraying out from the underground main valve on Marine Drive path, wasting thousands of liters.",
+            "category": "water",
+            "latitude": 18.9440,
+            "longitude": 72.8240,
+            "priority": ComplaintPriority.URGENT,
+            "status": ComplaintStatus.CLOSED,
+            "created_at": now - timedelta(days=12),
+            "updated_at": now - timedelta(days=11),
+            "department": water_dept,
+            "ward": ward_3,
+            "zone": ward_3.zone if ward_3 else None,
+            "officer": sarah,
+            "tracking_id": "CMP-MUM-2026-200001",
+            "rating": 4,
+            "feedback": "Valve replaced. Leakage completely stopped.",
+            "satisfaction_status": "satisfied",
+            "proof_remarks": "Replaced faulty gasket and tightened valve flange.",
+            "proof_uploaded_at": now - timedelta(days=11),
+        },
+        {
+            "title": "Low water pressure in building pipeline",
+            "description": "The water supply pressure has dropped significantly over the last few days in Colaba Sector 3 blocks.",
+            "category": "water",
+            "latitude": 18.9070,
+            "longitude": 72.8150,
+            "priority": ComplaintPriority.LOW,
+            "status": ComplaintStatus.SUBMITTED,
+            "created_at": now - timedelta(days=1),
+            "updated_at": now - timedelta(days=1),
+            "department": water_dept,
+            "ward": ward_3,
+            "zone": ward_3.zone if ward_3 else None,
+            "officer": None,
+            "tracking_id": "CMP-MUM-2026-200002",
+        },
+        {
+            "title": "Streetlights blinking repeatedly in Chembur",
+            "description": "Entire row of streetlights on Lane 4 blink constantly, creating visibility hazards at night.",
+            "category": "electricity",
+            "latitude": 19.0625,
+            "longitude": 72.8978,
+            "priority": ComplaintPriority.MEDIUM,
+            "status": ComplaintStatus.IN_PROGRESS,
+            "created_at": now - timedelta(days=5),
+            "updated_at": now - timedelta(days=4),
+            "department": elec_dept,
+            "ward": ward_5,
+            "zone": ward_5.zone if ward_5 else None,
+            "officer": mike,
+            "tracking_id": "CMP-MUM-2026-300001",
+        },
+        {
+            "title": "Hanging live wires on post",
+            "description": "A cut electrical cable is hanging low near Chembur junction, close to public walking path.",
+            "category": "electricity",
+            "latitude": 19.0630,
+            "longitude": 72.8980,
+            "priority": ComplaintPriority.URGENT,
+            "status": ComplaintStatus.RESOLVED,
+            "created_at": now - timedelta(days=8),
+            "updated_at": now - timedelta(days=7),
+            "department": elec_dept,
+            "ward": ward_5,
+            "zone": ward_5.zone if ward_5 else None,
+            "officer": mike,
+            "tracking_id": "CMP-MUM-2026-300002",
+            "rating": 5,
+            "feedback": "Fixed within hours, very quick response to critical issue.",
+            "satisfaction_status": "satisfied",
+            "proof_remarks": "Disconnected dead cable and taped hanging ends securely.",
+            "proof_uploaded_at": now - timedelta(days=7),
+        },
+        {
+            "title": "Overflowing public garbage bin",
+            "description": "The garbage container near Bandra bus stand is overflowing, spilling trash and attracting stray animals.",
+            "category": "sanitation",
+            "latitude": 19.0600,
+            "longitude": 72.8300,
+            "priority": ComplaintPriority.HIGH,
+            "status": ComplaintStatus.SUBMITTED,
+            "created_at": now - timedelta(days=2),
+            "updated_at": now - timedelta(days=2),
+            "department": sani_dept,
+            "ward": ward_7,
+            "zone": ward_7.zone if ward_7 else None,
+            "officer": None,
+            "tracking_id": "CMP-MUM-2026-400001",
+        },
+        {
+            "title": "Blocked drainage line on link road",
+            "description": "Drainage water is overflowing onto Link Road due to blockages in storm drains.",
+            "category": "sanitation",
+            "latitude": 19.0590,
+            "longitude": 72.8290,
+            "priority": ComplaintPriority.HIGH,
+            "status": ComplaintStatus.RESOLVED,
+            "created_at": now - timedelta(days=6),
+            "updated_at": now - timedelta(days=5),
+            "department": sani_dept,
+            "ward": ward_7,
+            "zone": ward_7.zone if ward_7 else None,
+            "officer": clara,
+            "tracking_id": "CMP-MUM-2026-400002",
+            "rating": 3,
+            "feedback": "Drain cleared but took almost 2 days to solve.",
+            "satisfaction_status": "neutral",
+            "proof_remarks": "Removed plastic and silt blockages using suction machine.",
+            "proof_uploaded_at": now - timedelta(days=5),
+        }
+    ]
+
+    for c in complaints_data:
+        comp = Complaint(
+            title=c["title"],
+            description=c["description"],
+            category=c["category"],
+            latitude=c["latitude"],
+            longitude=c["longitude"],
+            priority=c["priority"],
+            status=c["status"],
+            created_at=c["created_at"],
+            updated_at=c["updated_at"],
+            user_id=citizen.id,
+            department_id=c["department"].id if c["department"] else None,
+            ward_id=c["ward"].id if c["ward"] else None,
+            zone_id=c["zone"].id if c["zone"] else None,
+            officer_id=c["officer"].id if c["officer"] else None,
+            tracking_id=c["tracking_id"],
+            rating=c.get("rating"),
+            feedback=c.get("feedback"),
+            satisfaction_status=c.get("satisfaction_status"),
+            proof_remarks=c.get("proof_remarks"),
+            proof_uploaded_at=c.get("proof_uploaded_at"),
+            proof_uploaded_by_id=c["officer"].id if c.get("proof_uploaded_at") and c["officer"] else None,
+        )
+        db.session.add(comp)
+    
+    db.session.commit()
+

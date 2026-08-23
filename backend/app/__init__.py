@@ -48,6 +48,8 @@ def create_app(config_name=None):
         if app.config.get("SEED_DEMO_USERS", False):
             from app.models.user import seed_users
             seed_users()
+            from app.models.complaint import seed_complaints
+            seed_complaints()
 
     return app
 
@@ -80,7 +82,9 @@ def seed_dev_command():
     """Seed demo/reference data and demo user accounts (development only)."""
     from app.models.user import seed_users
     seed_users()
-    click.echo("Seeded demo users for development.")
+    from app.models.complaint import seed_complaints
+    seed_complaints()
+    click.echo("Seeded demo users and complaints for development.")
 
 
 def register_dev_commands(app):

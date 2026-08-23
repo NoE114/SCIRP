@@ -67,12 +67,18 @@ def seed_users():
     # Get departments to map officers
     road_dept = db.session.query(Department).filter_by(name="Road").first()
     water_dept = db.session.query(Department).filter_by(name="Water").first()
+    elec_dept = db.session.query(Department).filter_by(name="Electricity").first()
+    sani_dept = db.session.query(Department).filter_by(name="Sanitation").first()
 
     # Get wards/zones for assignment
     ward_1 = db.session.query(Ward).filter_by(name="Ward 1 (Airport Area)").first()
     ward_3 = db.session.query(Ward).filter_by(name="Ward 3 (Colaba)").first()
+    ward_5 = db.session.query(Ward).filter_by(name="Ward 5 (Chembur)").first()
+    ward_7 = db.session.query(Ward).filter_by(name="Ward 7 (Bandra)").first()
     zone_a = db.session.query(Zone).filter_by(name="Zone A (North)").first()
     zone_b = db.session.query(Zone).filter_by(name="Zone B (South)").first()
+    zone_c = db.session.query(Zone).filter_by(name="Zone C (East)").first()
+    zone_d = db.session.query(Zone).filter_by(name="Zone D (West)").first()
 
     demo_users = [
         {
@@ -110,6 +116,24 @@ def seed_users():
             "department_id": water_dept.id if water_dept else None,
             "ward_id": ward_3.id if ward_3 else None,
             "zone_id": zone_b.id if zone_b else None,
+        },
+        {
+            "name": "Officer Mike",
+            "email": "officer3@civicpulse.com",
+            "password": "officerpass123",
+            "role": UserRole.OFFICER,
+            "department_id": elec_dept.id if elec_dept else None,
+            "ward_id": ward_5.id if ward_5 else None,
+            "zone_id": zone_c.id if zone_c else None,
+        },
+        {
+            "name": "Officer Clara",
+            "email": "officer4@civicpulse.com",
+            "password": "officerpass123",
+            "role": UserRole.OFFICER,
+            "department_id": sani_dept.id if sani_dept else None,
+            "ward_id": ward_7.id if ward_7 else None,
+            "zone_id": zone_d.id if zone_d else None,
         },
         {
             "name": "Head of Road Dept",
